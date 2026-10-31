@@ -1,4 +1,4 @@
--- Seuls les services effectivement activés (ServiceInstance ACTIVE) figurent dans l'inventaire.
+-- Seuls les services effectivement actives (ServiceInstance ACTIVE) figurent dans l'inventaire.
 CREATE TABLE service_instance (
     service_id          UUID        PRIMARY KEY,
     client_id           VARCHAR(64) NOT NULL,

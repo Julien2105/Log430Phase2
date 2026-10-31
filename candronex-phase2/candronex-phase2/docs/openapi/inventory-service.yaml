@@ -1,0 +1,202 @@
+openapi: 3.0.3
+info:
+  title: CanDroneX - InventoryService
+  version: 2.0.0
+  description: Service Inventory (ServiceInstance). Base inventory_db. PUT interne.
+servers:
+- url: http://inventory-service:8084
+  description: Docker Compose
+security:
+- bearerAuth: []
+paths:
+  /api/v1/services:
+    get:
+      tags:
+      - Services
+      operationId: listServices
+      summary: Lister les services activés
+      parameters:
+      - &id001
+        name: X-Correlation-Id
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Identifiant de corrélation propagé; généré s'il est absent.
+      - name: droneId
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Services.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceInstance'
+        '401': &id002
+          description: JWT absent ou invalide (signature, expiration, issuer, audience candronex-api, clientId).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/services/{serviceId}:
+    get:
+      tags:
+      - Services
+      operationId: getService
+      summary: Consulter un service activé
+      parameters:
+      - *id001
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: ''
+      responses:
+        '200':
+          description: Service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInstance'
+        '401': *id002
+        '404':
+          description: Ressource inexistante ou appartenant à un autre client.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags:
+      - Interne
+      operationId: putService
+      summary: 'Enregistrer un service activé (interne : appelé par slice-service)'
+      parameters:
+      - *id001
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: ''
+      responses:
+        '200':
+          description: Enregistré.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInstance'
+        '400':
+          description: Requête invalide.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401': *id002
+        '403':
+          description: Client non autorisé à écrire pour un autre client.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceInstanceRequest'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Authorization: Bearer <JWT> émis par Keycloak (realm candronex). Validation : signature, expiration, issuer,
+        audience candronex-api, clientId.'
+  schemas:
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - correlationId
+      properties:
+        type:
+          type: string
+          example: https://candronex.example/problems/not-found
+        title:
+          type: string
+        status:
+          type: integer
+          example: 404
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+          example: NOT_FOUND
+        correlationId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+    ServiceInstanceRequest:
+      type: object
+      required:
+      - clientId
+      - orderId
+      - droneId
+      - serviceOfferingId
+      - state
+      - activatedAt
+      properties:
+        clientId:
+          type: string
+        orderId:
+          type: string
+          format: uuid
+        droneId:
+          type: string
+        serviceOfferingId:
+          type: string
+        state:
+          type: string
+          enum:
+          - ACTIVE
+        activatedAt:
+          type: string
+          format: date-time
+    ServiceInstance:
+      type: object
+      properties:
+        serviceId:
+          type: string
+        orderId:
+          type: string
+        droneId:
+          type: string
+        serviceOfferingId:
+          type: string
+        state:
+          type: string
+        activatedAt:
+          type: string
+          format: date-time
+      description: Sans IMSI.

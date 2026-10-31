@@ -1,0 +1,210 @@
+openapi: 3.0.3
+info:
+  title: CanDroneX - DroneService
+  version: 2.0.0
+  description: UC-02. Base drone_db. droneId unique par (clientId, droneId).
+servers:
+- url: http://drone-service:8081
+  description: Docker Compose
+security:
+- bearerAuth: []
+paths:
+  /api/v1/drones:
+    post:
+      tags:
+      - Drones
+      operationId: registerDrone
+      summary: Enregistrer un drone (UC-02)
+      parameters:
+      - &id001
+        name: X-Correlation-Id
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Identifiant de corrélation propagé; généré s'il est absent.
+      responses:
+        '201':
+          description: Créé.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Drone'
+        '200':
+          description: Rejeu identique.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Drone'
+        '400':
+          description: Requête invalide.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401': &id002
+          description: JWT absent ou invalide (signature, expiration, issuer, audience candronex-api, clientId).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: 'Conflit : même clé ou même identifiant avec un contenu différent.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DroneRequest'
+    get:
+      tags:
+      - Drones
+      operationId: listDrones
+      summary: Lister les drones du client
+      parameters:
+      - *id001
+      responses:
+        '200':
+          description: Drones.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Drone'
+        '401': *id002
+  /api/v1/drones/{droneId}:
+    get:
+      tags:
+      - Drones
+      operationId: getDrone
+      summary: Consulter un drone
+      parameters:
+      - *id001
+      - name: droneId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: ''
+      responses:
+        '200':
+          description: Drone.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Drone'
+        '401': *id002
+        '404': &id003
+          description: Ressource inexistante ou appartenant à un autre client.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/drones/{droneId}/network-identity:
+    get:
+      tags:
+      - Interne
+      operationId: getNetworkIdentity
+      summary: Identité réseau (interne, non publiée par la passerelle)
+      parameters:
+      - *id001
+      - name: droneId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: ''
+      responses:
+        '200':
+          description: Identité.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkIdentity'
+        '401': *id002
+        '404': *id003
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Authorization: Bearer <JWT> émis par Keycloak (realm candronex). Validation : signature, expiration, issuer,
+        audience candronex-api, clientId.'
+  schemas:
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - correlationId
+      properties:
+        type:
+          type: string
+          example: https://candronex.example/problems/not-found
+        title:
+          type: string
+        status:
+          type: integer
+          example: 404
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+          example: NOT_FOUND
+        correlationId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+    DroneRequest:
+      type: object
+      required:
+      - droneId
+      - imsi
+      properties:
+        droneId:
+          type: string
+          maxLength: 64
+          example: DRN-0231
+        imsi:
+          type: string
+          pattern: ^[0-9]{15}$
+          example: '302720123456789'
+        label:
+          type: string
+          maxLength: 200
+    Drone:
+      type: object
+      properties:
+        droneId:
+          type: string
+        label:
+          type: string
+        registeredAt:
+          type: string
+          format: date-time
+      description: L'IMSI n'est jamais exposé.
+    NetworkIdentity:
+      type: object
+      properties:
+        droneId:
+          type: string
+        imsi:
+          type: string

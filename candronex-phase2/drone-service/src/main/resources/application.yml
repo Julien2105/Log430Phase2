@@ -19,6 +19,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    encoding: UTF-8
 
 candronex:
   security:

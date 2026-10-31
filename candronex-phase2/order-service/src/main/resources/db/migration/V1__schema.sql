@@ -14,8 +14,8 @@ CREATE TABLE order_line (
     CONSTRAINT uq_order_line UNIQUE (order_id, drone_id, service_offering_id)
 );
 
--- Snapshot : caractéristiques de l'offre copiées au moment de la commande (sst, sd, dnn, 5qi...).
--- Le catalogue n'est jamais relu après la commande.
+-- Snapshot : caracteristiques de l'offre copiees au moment de la commande (sst, sd, dnn, 5qi...).
+-- Le catalogue n'est jamais relu apres la commande.
 CREATE TABLE order_line_characteristic (
     line_id UUID         NOT NULL REFERENCES order_line (id),
     name    VARCHAR(64)  NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE order_line_characteristic (
     PRIMARY KEY (line_id, name)
 );
 
--- Table d'idempotence : portée (client_id, idempotency_key), empreinte du contenu.
+-- Table d'idempotence : portee (client_id, idempotency_key), empreinte du contenu.
 CREATE TABLE idempotency_key (
     client_id       VARCHAR(64)  NOT NULL,
     idempotency_key VARCHAR(128) NOT NULL,

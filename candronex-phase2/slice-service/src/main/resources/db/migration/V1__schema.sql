@@ -1,10 +1,10 @@
--- SliceService possède l'état d'activation du Service et les dates acceptedAt / activatedAt (calcul du P95).
+-- SliceService possede l'etat d'activation du Service et les dates acceptedAt / activatedAt (calcul du P95).
 CREATE TABLE service (
-    id                  UUID         PRIMARY KEY,           -- = identifiant de l'OrderLine (clé d'idempotence)
+    id                  UUID         PRIMARY KEY,           -- = identifiant de l'OrderLine (cle d'idempotence)
     order_id            UUID         NOT NULL,
     client_id           VARCHAR(64)  NOT NULL,
     drone_id            VARCHAR(64)  NOT NULL,
-    imsi                VARCHAR(15)  NOT NULL,              -- interne : jamais exposé
+    imsi                VARCHAR(15)  NOT NULL,              -- interne : jamais expose
     service_offering_id VARCHAR(64)  NOT NULL,
     slice_type          VARCHAR(20),
     sst                 INTEGER,

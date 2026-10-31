@@ -1,4 +1,4 @@
--- Modèle du catalogue : ServiceOffering -> ServiceSpecification -> ServiceCharacteristic
+-- Modele du catalogue : ServiceOffering -> ServiceSpecification -> ServiceCharacteristic
 CREATE TABLE service_specification (
     id   VARCHAR(64)  PRIMARY KEY,
     name VARCHAR(120) NOT NULL

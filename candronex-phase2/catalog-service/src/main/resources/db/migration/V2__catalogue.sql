@@ -1,10 +1,10 @@
 INSERT INTO service_specification (id, name) VALUES
-  ('SPEC_URLLC', 'Slice URLLC - commande et contrôle'),
-  ('SPEC_EMBB',  'Slice eMBB - transmission vidéo');
+  ('SPEC_URLLC', 'Slice URLLC - commande et controle'),
+  ('SPEC_EMBB',  'Slice eMBB - transmission video');
 
 INSERT INTO service_offering (id, name, description, specification_id) VALUES
-  ('C2_URLLC',     'Command and Control',  'Connectivité à faible latence pour le pilotage du drone', 'SPEC_URLLC'),
-  ('IMAGERY_EMBB', 'Imagery Streaming',    'Connectivité à haut débit pour la transmission vidéo',    'SPEC_EMBB');
+  ('C2_URLLC',     'Command and Control',  'Connectivite a faible latence pour le pilotage du drone', 'SPEC_URLLC'),
+  ('IMAGERY_EMBB', 'Imagery Streaming',    'Connectivite a haut debit pour la transmission video',    'SPEC_EMBB');
 
 INSERT INTO service_characteristic (specification_id, name, value) VALUES
   ('SPEC_URLLC', 'sliceType', 'URLLC'),

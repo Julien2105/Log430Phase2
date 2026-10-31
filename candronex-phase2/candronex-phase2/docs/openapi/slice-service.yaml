@@ -1,0 +1,187 @@
+openapi: 3.0.3
+info:
+  title: CanDroneX - SliceService
+  version: 2.0.0
+  description: UC-06. Base slice_db. Routes internes (non publiées par la passerelle).
+servers:
+- url: http://slice-service:8083
+  description: Docker Compose
+security:
+- bearerAuth: []
+paths:
+  /api/v1/services/activation:
+    post:
+      tags:
+      - Activation (interne)
+      operationId: requestActivation
+      summary: Demander une activation (UC-06)
+      parameters:
+      - &id001
+        name: X-Correlation-Id
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Identifiant de corrélation propagé; généré s'il est absent.
+      responses:
+        '202':
+          description: Acceptée; activation asynchrone.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceStatus'
+        '400':
+          description: Requête invalide.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401': &id002
+          description: JWT absent ou invalide (signature, expiration, issuer, audience candronex-api, clientId).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      description: Idempotent par serviceId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceActivationRequest'
+    get:
+      tags:
+      - Activation (interne)
+      operationId: activationByOrder
+      summary: États des services d'une commande
+      parameters:
+      - *id001
+      - name: orderId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: États.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceStatus'
+        '401': *id002
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Authorization: Bearer <JWT> émis par Keycloak (realm candronex). Validation : signature, expiration, issuer,
+        audience candronex-api, clientId.'
+  schemas:
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - correlationId
+      properties:
+        type:
+          type: string
+          example: https://candronex.example/problems/not-found
+        title:
+          type: string
+        status:
+          type: integer
+          example: 404
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+          example: NOT_FOUND
+        correlationId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+    Characteristic:
+      type: object
+      properties:
+        name:
+          type: string
+          example: sst
+        value:
+          type: string
+          example: '2'
+    ServiceActivationRequest:
+      type: object
+      required:
+      - serviceId
+      - orderId
+      - droneId
+      - imsi
+      - serviceOfferingId
+      - serviceCharacteristic
+      - acceptedAt
+      properties:
+        serviceId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        droneId:
+          type: string
+        imsi:
+          type: string
+        serviceOfferingId:
+          type: string
+        serviceCharacteristic:
+          type: array
+          items:
+            $ref: '#/components/schemas/Characteristic'
+        acceptedAt:
+          type: string
+          format: date-time
+    ServiceStatus:
+      type: object
+      properties:
+        serviceId:
+          type: string
+        orderId:
+          type: string
+        droneId:
+          type: string
+        serviceOfferingId:
+          type: string
+        state:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVATING
+          - ACTIVE
+          - FAILED
+        acceptedAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        failureReason:
+          type: string
+          nullable: true
+      description: Sans IMSI.
