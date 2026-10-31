@@ -1,0 +1,217 @@
+# CanDroneX Phase 2 : démarrage complet avec `docker compose up --build`.
+# Seuls l'API Gateway (8000), Keycloak (8080) et Swagger UI (8089) sont publiés. Les microservices et leurs bases
+# restent sur le réseau interne `backend`.
+name: candronex
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HOSTNAME_URL: http://localhost:8080      # issuer stable : http://localhost:8080/realms/candronex
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      CLIENT_A_SECRET: ${CLIENT_A_SECRET:-client-a-secret}
+      CLIENT_B_SECRET: ${CLIENT_B_SECRET:-client-b-secret}
+      SLICE_CLIENT_SECRET: ${SLICE_CLIENT_SECRET:-slice-service-secret}
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports: ["8080:8080"]
+    networks: [edge, backend]
+
+  gateway:
+    image: devopsfaith/krakend:2.6
+    command: ["run", "-c", "/etc/krakend/krakend.json"]
+    volumes:
+      - ./gateway/krakend.json:/etc/krakend/krakend.json:ro
+    ports: ["8000:8000"]
+    depends_on: [drone-service, catalog-service, order-service, inventory-service]
+    networks: [edge, backend]
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.17.14
+    environment:
+      URLS: '[{"url":"/openapi/gateway-api.yaml","name":"gateway"},{"url":"/openapi/drone-service.yaml","name":"drone-service"},{"url":"/openapi/catalog-service.yaml","name":"catalog-service"},{"url":"/openapi/order-service.yaml","name":"order-service"},{"url":"/openapi/slice-service.yaml","name":"slice-service"},{"url":"/openapi/inventory-service.yaml","name":"inventory-service"}]'
+    volumes:
+      - ./docs/openapi:/usr/share/nginx/html/openapi:ro
+    ports: ["8089:8080"]
+    networks: [edge]
+
+  drone-service:
+    build:
+      context: .
+      dockerfile: drone-service/Dockerfile
+    depends_on:
+      drone-db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://drone-db:5432/drone_db
+      DB_USER: ${DB_USER:-candronex}
+      DB_PASSWORD: ${DB_PASSWORD:-candronex}
+      JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
+      JWT_ISSUER: http://localhost:8080/realms/candronex
+      JWT_AUDIENCE: candronex-api
+    networks: [backend]
+    restart: unless-stopped
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: catalog-service/Dockerfile
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://catalog-db:5432/catalog_db
+      DB_USER: ${DB_USER:-candronex}
+      DB_PASSWORD: ${DB_PASSWORD:-candronex}
+      JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
+      JWT_ISSUER: http://localhost:8080/realms/candronex
+      JWT_AUDIENCE: candronex-api
+    networks: [backend]
+    restart: unless-stopped
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://inventory-db:5432/inventory_db
+      DB_USER: ${DB_USER:-candronex}
+      DB_PASSWORD: ${DB_PASSWORD:-candronex}
+      JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
+      JWT_ISSUER: http://localhost:8080/realms/candronex
+      JWT_AUDIENCE: candronex-api
+      INVENTORY_TRUSTED_CLIENTS: slice-service
+    networks: [backend]
+    restart: unless-stopped
+
+  slice-service:
+    build:
+      context: .
+      dockerfile: slice-service/Dockerfile
+    depends_on:
+      slice-db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://slice-db:5432/slice_db
+      DB_USER: ${DB_USER:-candronex}
+      DB_PASSWORD: ${DB_PASSWORD:-candronex}
+      JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
+      JWT_ISSUER: http://localhost:8080/realms/candronex
+      JWT_AUDIENCE: candronex-api
+      INVENTORY_SERVICE_URL: http://inventory-service:8084
+      KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/candronex/protocol/openid-connect/token
+      SLICE_CLIENT_ID: slice-service
+      SLICE_CLIENT_SECRET: ${SLICE_CLIENT_SECRET:-slice-service-secret}
+      MOCK_LATENCY_MIN_MS: ${MOCK_LATENCY_MIN_MS:-300}
+      MOCK_LATENCY_MAX_MS: ${MOCK_LATENCY_MAX_MS:-1500}
+      MOCK_FAILURE_RATE: ${MOCK_FAILURE_RATE:-0}
+    networks: [backend]
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    depends_on:
+      order-db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://order-db:5432/order_db
+      DB_USER: ${DB_USER:-candronex}
+      DB_PASSWORD: ${DB_PASSWORD:-candronex}
+      JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
+      JWT_ISSUER: http://localhost:8080/realms/candronex
+      JWT_AUDIENCE: candronex-api
+      DRONE_SERVICE_URL: http://drone-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8085
+      SLICE_SERVICE_URL: http://slice-service:8083
+    networks: [backend]
+    restart: unless-stopped
+
+  drone-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: drone_db
+      POSTGRES_USER: ${DB_USER:-candronex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-candronex}
+    volumes: [drone-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d drone_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  catalog-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: catalog_db
+      POSTGRES_USER: ${DB_USER:-candronex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-candronex}
+    volumes: [catalog-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d catalog_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  order-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: ${DB_USER:-candronex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-candronex}
+    volumes: [order-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d order_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  slice-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: slice_db
+      POSTGRES_USER: ${DB_USER:-candronex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-candronex}
+    volumes: [slice-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d slice_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  inventory-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: ${DB_USER:-candronex}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-candronex}
+    volumes: [inventory-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d inventory_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+networks:
+  edge:
+  backend:
+
+volumes:
+  drone-db-data:
+  catalog-db-data:
+  order-db-data:
+  slice-db-data:
+  inventory-db-data:

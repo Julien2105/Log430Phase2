@@ -1,0 +1,143 @@
+openapi: 3.0.3
+info:
+  title: CanDroneX - CatalogService
+  version: 2.0.0
+  description: ServiceOffering -> ServiceSpecification -> ServiceCharacteristic. Base catalog_db.
+servers:
+- url: http://catalog-service:8085
+  description: Docker Compose
+security:
+- bearerAuth: []
+paths:
+  /api/v1/service-offerings:
+    get:
+      tags:
+      - Catalogue
+      operationId: listOfferings
+      summary: Lister les offres
+      parameters:
+      - &id001
+        name: X-Correlation-Id
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Identifiant de corrélation propagé; généré s'il est absent.
+      responses:
+        '200':
+          description: Offres.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceOffering'
+        '401': &id002
+          description: JWT absent ou invalide (signature, expiration, issuer, audience candronex-api, clientId).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/service-offerings/{serviceOfferingId}:
+    get:
+      tags:
+      - Catalogue
+      operationId: getOffering
+      summary: Consulter une offre
+      parameters:
+      - *id001
+      - name: serviceOfferingId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: ''
+      responses:
+        '200':
+          description: Offre.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceOffering'
+        '401': *id002
+        '404':
+          description: Offre inconnue.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Authorization: Bearer <JWT> émis par Keycloak (realm candronex). Validation : signature, expiration, issuer,
+        audience candronex-api, clientId.'
+  schemas:
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - correlationId
+      properties:
+        type:
+          type: string
+          example: https://candronex.example/problems/not-found
+        title:
+          type: string
+        status:
+          type: integer
+          example: 404
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+          example: NOT_FOUND
+        correlationId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+    Characteristic:
+      type: object
+      properties:
+        name:
+          type: string
+          example: sst
+        value:
+          type: string
+          example: '2'
+    ServiceOffering:
+      type: object
+      properties:
+        serviceOfferingId:
+          type: string
+          example: C2_URLLC
+        name:
+          type: string
+        description:
+          type: string
+        serviceSpecification:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        serviceCharacteristics:
+          type: array
+          items:
+            $ref: '#/components/schemas/Characteristic'

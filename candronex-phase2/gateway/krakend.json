@@ -1,0 +1,262 @@
+{
+  "$schema": "https://www.krakend.io/schema/v2.6/krakend.json",
+  "version": 3,
+  "name": "CanDroneX API Gateway",
+  "port": 8000,
+  "timeout": "10s",
+  "cache_ttl": "0s",
+  "output_encoding": "no-op",
+  "extra_config": {
+    "router": {
+      "return_error_msg": true,
+      "auto_options": true
+    },
+    "security/cors": {
+      "allow_origins": [
+        "http://localhost:8089"
+      ],
+      "allow_methods": [
+        "GET",
+        "POST",
+        "OPTIONS"
+      ],
+      "allow_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "expose_headers": [
+        "Location",
+        "X-Correlation-Id"
+      ],
+      "max_age": "12h"
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "/api/v1/drones",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/drones",
+          "encoding": "no-op",
+          "host": [
+            "http://drone-service:8081"
+          ],
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/drones",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/drones",
+          "encoding": "no-op",
+          "host": [
+            "http://drone-service:8081"
+          ],
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/drones/{droneId}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/drones/{droneId}",
+          "encoding": "no-op",
+          "host": [
+            "http://drone-service:8081"
+          ],
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/service-offerings",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/service-offerings",
+          "encoding": "no-op",
+          "host": [
+            "http://catalog-service:8085"
+          ],
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/service-offerings/{serviceOfferingId}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/service-offerings/{serviceOfferingId}",
+          "encoding": "no-op",
+          "host": [
+            "http://catalog-service:8085"
+          ],
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/orders",
+      "method": "POST",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/orders",
+          "encoding": "no-op",
+          "host": [
+            "http://order-service:8082"
+          ],
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/orders",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/orders",
+          "encoding": "no-op",
+          "host": [
+            "http://order-service:8082"
+          ],
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/orders/{orderId}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/orders/{orderId}",
+          "encoding": "no-op",
+          "host": [
+            "http://order-service:8082"
+          ],
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/services",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/services",
+          "encoding": "no-op",
+          "host": [
+            "http://inventory-service:8084"
+          ],
+          "method": "GET"
+        }
+      ],
+      "input_query_strings": [
+        "droneId"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/services/{serviceId}",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "input_headers": [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Idempotency-Key",
+        "X-Correlation-Id"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/api/v1/services/{serviceId}",
+          "encoding": "no-op",
+          "host": [
+            "http://inventory-service:8084"
+          ],
+          "method": "GET"
+        }
+      ]
+    }
+  ]
+}

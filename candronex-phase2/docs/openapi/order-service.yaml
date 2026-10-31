@@ -1,0 +1,252 @@
+openapi: 3.0.3
+info:
+  title: CanDroneX - OrderService
+  version: 2.0.0
+  description: UC-04. Base order_db. Idempotency-Key obligatoire.
+servers:
+- url: http://order-service:8082
+  description: Docker Compose
+security:
+- bearerAuth: []
+paths:
+  /api/v1/orders:
+    post:
+      tags:
+      - Commandes
+      operationId: createOrder
+      summary: Créer une commande (UC-04)
+      parameters:
+      - &id001
+        name: X-Correlation-Id
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Identifiant de corrélation propagé; généré s'il est absent.
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+        description: Même clé + même contenu = même commande (200); même clé + contenu différent = 409.
+      responses:
+        '201':
+          description: Créée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '200':
+          description: Rejeu identique.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Requête invalide.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401': &id002
+          description: JWT absent ou invalide (signature, expiration, issuer, audience candronex-api, clientId).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Drone ou offre introuvable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: 'Conflit : même clé ou même identifiant avec un contenu différent.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Dépendance indisponible.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+    get:
+      tags:
+      - Commandes
+      operationId: listOrders
+      summary: Lister les commandes
+      parameters:
+      - *id001
+      responses:
+        '200':
+          description: Commandes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401': *id002
+  /api/v1/orders/{orderId}:
+    get:
+      tags:
+      - Commandes
+      operationId: getOrder
+      summary: Consulter une commande et l'état de ses services
+      parameters:
+      - *id001
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: ''
+      responses:
+        '200':
+          description: Commande.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401': *id002
+        '404':
+          description: Ressource inexistante ou appartenant à un autre client.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Authorization: Bearer <JWT> émis par Keycloak (realm candronex). Validation : signature, expiration, issuer,
+        audience candronex-api, clientId.'
+  schemas:
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - correlationId
+      properties:
+        type:
+          type: string
+          example: https://candronex.example/problems/not-found
+        title:
+          type: string
+        status:
+          type: integer
+          example: 404
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+          example: NOT_FOUND
+        correlationId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+    Characteristic:
+      type: object
+      properties:
+        name:
+          type: string
+          example: sst
+        value:
+          type: string
+          example: '2'
+    OrderRequest:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - action
+            - droneId
+            - serviceOfferingId
+            properties:
+              action:
+                type: string
+                enum:
+                - ADD
+              droneId:
+                type: string
+                example: DRN-0231
+              serviceOfferingId:
+                type: string
+                example: C2_URLLC
+    Order:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - ACCEPTED
+          - IN_PROGRESS
+          - ACTIVE
+          - PARTIALLY_ACTIVE
+          - FAILED
+        acceptedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              lineId:
+                type: string
+                format: uuid
+              action:
+                type: string
+              droneId:
+                type: string
+              state:
+                type: string
+                enum:
+                - PENDING
+                - ACTIVATING
+                - ACTIVE
+                - FAILED
+              service:
+                type: object
+                properties:
+                  serviceOfferingId:
+                    type: string
+                  serviceCharacteristic:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Characteristic'
+                description: Caractéristiques copiées (snapshot) au moment de la commande.
