@@ -75,13 +75,14 @@ public class ActivateServiceService implements ActivateServiceUseCase {
             return; // échec réseau : aucune écriture dans l'inventaire
         }
         service.markActive(clock.now());
-        services.save(service);
-        audit.record("SERVICE_ACTIVATED", client, order, "serviceId=" + service.serviceId());
+        // L'inventaire est alimente AVANT de publier l'etat ACTIVE : une commande ACTIVE est donc toujours deja visible dans l'inventaire.
         try {
             inventory.record(new ServiceInstanceRecord(service.serviceId(), service.clientId(), service.orderId(),
                     service.droneId(), service.serviceOfferingId(), service.activatedAt()), job.bearerToken());
         } catch (RuntimeException e) {
-            audit.record("INVENTORY_SYNC_FAILED", client, order, "serviceId=" + service.serviceId());
+            audit.record("INVENTORY_SYNC_FAILED", client, order, "serviceId=" + service.serviceId() + " cause=" + e.getClass().getSimpleName());
         }
+        services.save(service);
+        audit.record("SERVICE_ACTIVATED", client, order, "serviceId=" + service.serviceId());
     }
 }
