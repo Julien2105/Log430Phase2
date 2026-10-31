@@ -42,7 +42,7 @@ public class ActivateServiceService implements ActivateServiceUseCase {
             if (!existing.get().clientId().equals(c.clientId())) {
                 throw DomainException.conflict("SERVICE_CONFLICT", "Ce service appartient à un autre client");
             }
-            return new Result(existing.get(), false); // rejeu : clé = serviceId, aucune nouvelle configuration réseau
+            return new Result(existing.get(), false);
         }
         Service service = Service.accept(c.serviceId(), c.orderId(), c.clientId(), c.droneId(), c.imsi(),
                 c.serviceOfferingId(), c.characteristics(), c.acceptedAt());
@@ -55,7 +55,7 @@ public class ActivateServiceService implements ActivateServiceUseCase {
     @Override
     public void execute(ActivationJob job) {
         Optional<Service> claimed = services.claimForActivation(job.serviceId());
-        if (claimed.isEmpty()) return; // déjà pris en charge ou terminal : pas de double activation
+        if (claimed.isEmpty()) return;
         Service service = claimed.get();
         String client = service.clientId().value();
         String order = service.orderId().toString();
@@ -72,10 +72,9 @@ public class ActivateServiceService implements ActivateServiceUseCase {
             service.markFailed(result.failureReason());
             services.save(service);
             audit.record("SERVICE_FAILED", client, order, "serviceId=" + service.serviceId() + " reason=" + result.failureReason());
-            return; // échec réseau : aucune écriture dans l'inventaire
+            return;
         }
         service.markActive(clock.now());
-        // L'inventaire est alimente AVANT de publier l'etat ACTIVE : une commande ACTIVE est donc toujours deja visible dans l'inventaire.
         try {
             inventory.record(new ServiceInstanceRecord(service.serviceId(), service.clientId(), service.orderId(),
                     service.droneId(), service.serviceOfferingId(), service.activatedAt()), job.bearerToken());
