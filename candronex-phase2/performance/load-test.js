@@ -48,14 +48,15 @@ export function setup() {
   check(res, { 'jeton Keycloak obtenu': (r) => r.status === 200 });
   const token = res.json('access_token');
   const run = Date.now() % 100000;
+  const imsiRun = Math.floor(Date.now() / 1000) % 10000;
   const drones = [];
   for (let i = 0; i < SETUP_DRONES; i++) {
     const droneId = `DRN-LT-${run}-${i}`;
-    const imsi = `302721${String(run * 1000 + i).padStart(9, '0').slice(-9)}`;
+    const imsi = `303${String(imsiRun).padStart(4, '0')}${String(0).padStart(4, '0')}${String(i).padStart(4, '0')}`;
     const r = http.post(`${GATEWAY}/api/v1/drones`, JSON.stringify({ droneId, imsi, label: 'charge' }), { headers: headers(token) });
     if (r.status === 201 || r.status === 200) drones.push(droneId);
   }
-  return { token, drones, run };
+  return { token, drones, run, imsiRun };
 }
 
 export default function (data) {
@@ -72,9 +73,8 @@ export default function (data) {
     res = http.post(`${GATEWAY}/api/v1/orders`, body, { headers: headers(data.token, { 'Idempotency-Key': `k6-${__VU}-${__ITER}-${data.run}` }) });
     check(res, { 'commande 201': (r) => r.status === 201 });
   } else {                                            // 10 % enregistrements de drones
-    const n = (__VU * 1000000 + __ITER) % 1000000000;
-    const droneId = `DRN-K6-${data.run}-${__VU}-${__ITER}`;
-    const imsi = `302722${String(n).padStart(9, '0')}`;
+        const droneId = `DRN-K6-${data.run}-${__VU}-${__ITER}`;
+    const imsi = `302${String(data.imsiRun).padStart(4, '0')}${String(__VU % 10000).padStart(4, '0')}${String(__ITER % 10000).padStart(4, '0')}`;
     res = http.post(`${GATEWAY}/api/v1/drones`, JSON.stringify({ droneId, imsi, label: 'k6' }), { headers: h });
     check(res, { 'drone 201/409': (r) => r.status === 201 || r.status === 409 });
   }

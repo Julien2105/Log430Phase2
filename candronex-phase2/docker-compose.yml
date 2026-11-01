@@ -13,6 +13,7 @@ services:
       KC_HOSTNAME_URL: http://localhost:8080      # issuer stable : http://localhost:8080/realms/candronex
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: -Xms512m -Xmx1g
       CLIENT_A_SECRET: ${CLIENT_A_SECRET:-client-a-secret}
       CLIENT_B_SECRET: ${CLIENT_B_SECRET:-client-b-secret}
       SLICE_CLIENT_SECRET: ${SLICE_CLIENT_SECRET:-slice-service-secret}
@@ -53,6 +54,7 @@ services:
       JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
       JWT_ISSUER: http://localhost:8080/realms/candronex
       JWT_AUDIENCE: candronex-api
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
     networks: [backend]
     restart: unless-stopped
 
@@ -70,6 +72,7 @@ services:
       JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
       JWT_ISSUER: http://localhost:8080/realms/candronex
       JWT_AUDIENCE: candronex-api
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
     networks: [backend]
     restart: unless-stopped
 
@@ -87,6 +90,7 @@ services:
       JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
       JWT_ISSUER: http://localhost:8080/realms/candronex
       JWT_AUDIENCE: candronex-api
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
       INVENTORY_TRUSTED_CLIENTS: slice-service
     networks: [backend]
     restart: unless-stopped
@@ -105,6 +109,7 @@ services:
       JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
       JWT_ISSUER: http://localhost:8080/realms/candronex
       JWT_AUDIENCE: candronex-api
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
       INVENTORY_SERVICE_URL: http://inventory-service:8084
       KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/candronex/protocol/openid-connect/token
       SLICE_CLIENT_ID: slice-service
@@ -129,6 +134,7 @@ services:
       JWT_JWK_SET_URI: http://keycloak:8080/realms/candronex/protocol/openid-connect/certs
       JWT_ISSUER: http://localhost:8080/realms/candronex
       JWT_AUDIENCE: candronex-api
+      JAVA_TOOL_OPTIONS: -Xms256m -Xmx512m
       DRONE_SERVICE_URL: http://drone-service:8081
       CATALOG_SERVICE_URL: http://catalog-service:8085
       SLICE_SERVICE_URL: http://slice-service:8083

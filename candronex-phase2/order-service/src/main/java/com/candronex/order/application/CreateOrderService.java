@@ -67,8 +67,6 @@ public class CreateOrderService implements CreateOrderUseCase, GetOrderQuery {
             throw DomainException.validation("VALIDATION_ERROR", "La commande doit contenir entre 1 et " + MAX_ITEMS + " éléments");
         }
         String hash = hash(c.items());
-
-        // 1. Idempotence : même clé + même contenu = même commande; contenu différent = 409.
         Optional<IdempotencyRecord> known = orders.findByKey(c.clientId(), c.key());
         if (known.isPresent()) {
             if (!known.get().requestHash().equals(hash)) {
@@ -78,11 +76,9 @@ public class CreateOrderService implements CreateOrderUseCase, GetOrderQuery {
             Order existing = orders.find(c.clientId(), known.get().orderId())
                     .orElseThrow(() -> DomainException.notFound("Commande introuvable"));
             audit.record("ORDER_REPLAYED", c.clientId().value(), existing.id().toString(), "key=" + c.key());
-            completeDispatch(existing, new LinkedHashMap<>()); // le rejeu termine le travail interrompu
+            completeDispatch(existing, new LinkedHashMap<>(), true);
             return new Result(view(existing), false);
         }
-
-        // 2. Validation métier + snapshot des caractéristiques (le catalogue n'est plus relu ensuite).
         Map<DroneId, NetworkIdentity> identities = new LinkedHashMap<>();
         Set<String> seen = new HashSet<>();
         List<OrderLine> lines = new ArrayList<>();
@@ -93,27 +89,25 @@ public class CreateOrderService implements CreateOrderUseCase, GetOrderQuery {
             if (!seen.add(droneId.value() + "|" + offeringId.value())) {
                 throw DomainException.unprocessable("UNSUPPORTED_ITEM", "Ligne dupliquée dans la commande");
             }
-            if (!identities.containsKey(droneId)) identities.put(droneId, drones.networkIdentity(droneId)); // 404 si non propriétaire
+            if (!identities.containsKey(droneId)) identities.put(droneId, drones.networkIdentity(droneId));
             OfferingSnapshot offering = catalogue.find(offeringId)
                     .orElseThrow(() -> DomainException.unprocessable("UNSUPPORTED_ITEM", "Offre de service inconnue : " + offeringId));
             lines.add(new OrderLine(LineId.random(), action, droneId, offeringId, offering.characteristics()));
         }
         Order order = new Order(OrderId.random(), c.clientId(), clock.now(), lines);
-
-        // 3. Persistance locale (commande + clé d'idempotence), puis activations hors transaction.
         orders.save(order, c.key(), hash);
         audit.record("ORDER_CREATED", c.clientId().value(), order.id().toString(), "lines=" + lines.size());
-        completeDispatch(order, identities);
-        return new Result(view(order), true);
+        completeDispatch(order, identities, false);
+        return new Result(new OrderView(order, Map.of()), true);
     }
-
-    /** Envoie à SliceService les lignes sans état connu. Un échec laisse la commande ACCEPTED (rejeu possible). */
-    private void completeDispatch(Order order, Map<DroneId, NetworkIdentity> identities) {
-        Map<LineId, ServiceState> known;
-        try {
-            known = activation.statesOf(order.id());
-        } catch (DomainException e) {
-            known = Map.of();
+    private void completeDispatch(Order order, Map<DroneId, NetworkIdentity> identities, boolean replay) {
+        Map<LineId, ServiceState> known = Map.of();
+        if (replay) {
+            try {
+                known = activation.statesOf(order.id());
+            } catch (DomainException e) {
+                known = Map.of();
+            }
         }
         for (OrderLine line : order.lines()) {
             if (known.containsKey(line.id())) continue;
@@ -135,7 +129,7 @@ public class CreateOrderService implements CreateOrderUseCase, GetOrderQuery {
         try {
             return new OrderView(order, activation.statesOf(order.id()));
         } catch (DomainException e) {
-            return new OrderView(order, Map.of()); // SliceService indisponible : la commande reste lisible (ACCEPTED)
+            return new OrderView(order, Map.of());
         }
     }
 
