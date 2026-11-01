@@ -5,10 +5,12 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import java.net.SocketTimeoutException;
+import java.net.http.HttpClient;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.function.Supplier;
 import org.slf4j.MDC;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -17,10 +19,6 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
-/**
- * Appel REST sortant : délais d'attente, disjoncteur Resilience4j, propagation du JWT du client et de X-Correlation-Id,
- * traduction des pannes en 503 SERVICE_UNAVAILABLE / 504 UPSTREAM_TIMEOUT.
- */
 public class RemoteCall {
 
     private final String name;
@@ -28,9 +26,12 @@ public class RemoteCall {
     private final CircuitBreaker breaker;
 
     public RemoteCall(String name, RemoteProperties.Target target) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(target.connectTimeoutMs());
-        factory.setReadTimeout(target.readTimeoutMs());
+        HttpClient http = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofMillis(target.connectTimeoutMs()))
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(http);
+        factory.setReadTimeout(Duration.ofMillis(target.readTimeoutMs()));
         this.name = name;
         this.client = RestClient.builder().baseUrl(target.baseUrl()).requestFactory(factory)
                 .requestInterceptor((request, body, execution) -> {
@@ -41,17 +42,18 @@ public class RemoteCall {
                     return execution.execute(request, body);
                 }).build();
         this.breaker = CircuitBreaker.of(name, CircuitBreakerConfig.custom()
-                .slidingWindowSize(20)
+                .slidingWindowSize(100)
+                .minimumNumberOfCalls(50)
                 .failureRateThreshold(50)
-                .waitDurationInOpenState(Duration.ofSeconds(10))
+                .permittedNumberOfCallsInHalfOpenState(20)
+                .waitDurationInOpenState(Duration.ofSeconds(5))
                 .ignoreExceptions(HttpClientErrorException.class)
                 .build());
     }
 
     public RestClient client() { return client; }
 
-    /** Exécute l'appel; les erreurs 4xx remontent telles quelles (à traiter par l'appelant). */
-    public <T> T call(Supplier<T> supplier) {
+        public <T> T call(Supplier<T> supplier) {
         try {
             return CircuitBreaker.decorateSupplier(breaker, supplier).get();
         } catch (HttpClientErrorException e) {
@@ -59,7 +61,7 @@ public class RemoteCall {
         } catch (CallNotPermittedException e) {
             throw DomainException.unavailable("Service " + name + " momentanément indisponible");
         } catch (ResourceAccessException e) {
-            if (e.getCause() instanceof SocketTimeoutException) {
+            if (e.getCause() instanceof SocketTimeoutException || e.getCause() instanceof HttpTimeoutException) {
                 throw DomainException.timeout("Délai dépassé en appelant " + name);
             }
             throw DomainException.unavailable("Service " + name + " indisponible");
